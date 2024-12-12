@@ -22,31 +22,24 @@ model_level.fit(level_data)
 model_storage = Prophet(yearly_seasonality=True, daily_seasonality=True)
 model_storage.fit(storage_data)
 
-@app.route("/forecast", methods=["POST"])
-def forecast():
+# Monthly forecast endpoint
+@app.route("/forecast-monthly", methods=["POST"])
+def forecast_monthly():
     try:
-        # Receive the year from the request body
         data = request.json
         if not data or "year" not in data:
             return jsonify({"error": "Missing 'year' in request data"}), 400
 
-        year = int(data.get("year"))
-        print(f"Forecast requested for year: {year}")  # Debugging log
+        year = int(data["year"])
 
-        # Validate year range to allow only years greater than 2020
-        if year < 2021:
-            return jsonify({"error": "Forecasting is only available for years after 2020"}), 400
+        if year < 2021 or year < 2000 or year > 2050:
+            return jsonify({"error": "Year must be between 2000 and 2050 and greater than 2020"}), 400
 
-        # Validate year range
-        if year < 2000 or year > 2050:
-            return jsonify({"error": "Year must be between 2000 and 2050"}), 400
-
-        # Generate future dates for the given year
+        # Generate future dates for the given year (monthly)
         start_date = f"{year}-01-01"
         end_date = f"{year}-12-31"
-        future_dates = pd.date_range(start=start_date, end=end_date)
+        future_dates = pd.date_range(start=start_date, end=end_date, freq="M")
 
-        # Predictions for level and storage
         future_level = pd.DataFrame({"ds": future_dates})
         future_storage = pd.DataFrame({"ds": future_dates})
 
@@ -64,7 +57,6 @@ def forecast():
         monthly_level_str = {str(key): value for key, value in monthly_level.items()}
         monthly_storage_str = {str(key): value for key, value in monthly_storage.items()}
 
-        # Prepare response data
         response = {
             "year": year,
             "monthly_level": monthly_level_str,
@@ -73,7 +65,42 @@ def forecast():
         return jsonify(response)
 
     except Exception as e:
-        print("Error processing the request:", e)  # Debugging log
+        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+
+
+# Daily forecast endpoint
+@app.route("/forecast-daily", methods=["POST"])
+def forecast_daily():
+    try:
+        data = request.json
+        if not data or "date" not in data:
+            return jsonify({"error": "Missing 'date' in request data"}), 400
+
+        selected_date = pd.to_datetime(data["date"])
+        future_dates = pd.date_range(start=selected_date, periods=15)
+
+        future_level = pd.DataFrame({"ds": future_dates})
+        future_storage = pd.DataFrame({"ds": future_dates})
+
+        forecast_level = model_level.predict(future_level)
+        forecast_storage = model_storage.predict(future_storage)
+
+        daily_level = [
+            {"date": row["ds"].strftime("%Y-%m-%d"), "level": row["yhat"]}
+            for _, row in forecast_level.iterrows()
+        ]
+        daily_storage = [
+            {"date": row["ds"].strftime("%Y-%m-%d"), "storage": row["yhat"]}
+            for _, row in forecast_storage.iterrows()
+        ]
+
+        return jsonify({
+            "start_date": selected_date.strftime("%Y-%m-%d"),
+            "daily_level": daily_level,
+            "daily_storage": daily_storage
+        })
+
+    except Exception as e:
         return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
 
 

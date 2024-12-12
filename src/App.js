@@ -35,6 +35,7 @@ import Map from "./components/Map";
 import Home from "./components/Home";
 import TimeSimulation from "./components/TimeSimulation";
 import Analysis from "./components/Analysis";
+import Forecast from "./components/Forecast";
 
 const App = () => {
   const location = useLocation(); // Get the current location
@@ -55,6 +56,7 @@ const App = () => {
         <Route path="/map" element={<Map />} />
         <Route path="/TimeSimulation" element={<TimeSimulation />} />
         <Route path="/Analysis" element={<Analysis />} />
+        <Route path="/forecast" element={<Forecast/>}/>
       </Routes>
     </>
   );
